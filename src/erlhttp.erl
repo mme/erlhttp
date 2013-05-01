@@ -28,7 +28,6 @@ new() ->
 
 parse({Parser, Mode, State, Rest, Result}) ->
     case parse(Mode, State, Rest, Result) of
-        {done, {Mode1, State1, Rest1, Result1}} -> {done, {Parser, Mode1, State1, Rest1, Result1}};
         {more, {Mode1, State1, Rest1, Result1}} -> {more, {Parser, Mode1, State1, Rest1, Result1}};
         {Other, {Mode1, State1, Rest1, []}, Result1} -> {Other, {Parser, Mode1, State1, Rest1, []}, Result1}
     end.
@@ -130,7 +129,7 @@ parse(body, undefined, [], Result) ->
     {body, {body, undefined, [], []}, Result};
  
 parse(body, undefined, [done], Result) ->
-    {body, {done, undefined, [], done}, Result};
+    {body, {done, undefined, [], []}, Result};
 
 % done
 parse(done, State, Rest, Result) ->
