@@ -1,0 +1,14 @@
+{application, erlhttp,
+ [
+  {description, "Erlang http parser NIF"},
+  {vsn, "2.0"},
+  {modules, [
+             erlhttp
+            ]},
+  {registered, []},
+  {applications, [
+                  kernel,
+                  stdlib
+                 ]},
+  {env, []}
+ ]}.
