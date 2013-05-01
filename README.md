@@ -10,7 +10,8 @@ Usage
 ```erlang
 {ok, Parser} = erlhttp:new(),
 Request = <<"GET /index.html HTTP/1.1\r\nHost: www.example.com\r\n\r\n">>,
-{request, _, Result} = erlhttp:parse(Parser, Request). 
+{ok, Parser1} = erlhttp:update(Parser, Request),
+{request, _, Result} = erlhttp:parse(Parser1). 
 %% Result is now [{url,<<"/index.html">>},{version,{1,1}},{method,get}]
 ```
 

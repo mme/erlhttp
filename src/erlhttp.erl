@@ -2,7 +2,7 @@
 
 -version(0.1).
 -on_load(init/0).
--export([new/0, parse_raw/2, is_upgrade/1, should_keepalive/1, parse/2, parse/1, new_parser_raw/1]).
+-export([new/0, parse_raw/2, is_upgrade/1, should_keepalive/1, update/2, parse/1, new_parser_raw/1]).
 
 
 init() ->
@@ -32,15 +32,15 @@ parse({Parser, Mode, State, Rest, Result}) ->
         {more, {Mode1, State1, Rest1, Result1}} -> {more, {Parser, Mode1, State1, Rest1, Result1}};
         {Other, {Mode1, State1, Rest1, []}, Result1} -> {Other, {Parser, Mode1, State1, Rest1, []}, Result1}
     end.
- 
-parse({Parser, Mode, State, Rest, Result}, Bin) ->
+
+update({Parser, Mode, State, Rest, Result}, Bin) ->
     case parse_raw(Parser,Bin) of
         {ok, Parsed} -> 
-            parse({Parser, Mode, State, Rest ++ lists:reverse(Parsed), Result});
+            {ok, {Parser, Mode, State, Rest ++ lists:reverse(Parsed), Result}};
         Error -> 
             Error
     end.
-
+ 
 %% Request Method
 parse(request, _State, [Method={method, _}|Rest], Result) ->
     parse(request,undefined,Rest,[Method|Result]);
