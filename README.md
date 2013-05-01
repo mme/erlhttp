@@ -1,7 +1,7 @@
 erlhttp
 ================================
 
-*erlang bindings for http-parser*
+*erlang bindings for http-parser*, see https://github.com/joyent/http-parser
 
 
 Usage
