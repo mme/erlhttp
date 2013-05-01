@@ -16,9 +16,13 @@ Request = <<"GET /index.html HTTP/1.1\r\nHost: www.example.com\r\n\r\n">>,
 ```erlhttp:parse``` return values:
 
 ```{request, Parser, Result}``` finished parsing request method, url http version
+
 ```{headers, Parser, Result}``` finished parsing headers
+
 ```{body, Parser, Result}``` finished parsing a body chunk
+
 ```{done, Parser}``` done parsing
+
 ```{more, Parser}``` need more data, call erlhttp:parse/2
 
 
