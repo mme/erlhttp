@@ -10,9 +10,12 @@ Usage
 ```erlang
 {ok, Parser} = erlhttp:new(),
 Request = <<"GET /index.html HTTP/1.1\r\nHost: www.example.com\r\n\r\n">>,
-{ok, Parser1} = erlhttp:update(Parser, Request),
-{request, _, Result} = erlhttp:parse(Parser1). 
-%% Result is now [{url,<<"/index.html">>},{version,{1,1}},{method,get}]
+{ok, Parser1, Rest} = erlhttp:update(Parser, Request), 
+% In a pipelined connection, Rest will contain parts of the next request 
+{request, Parser2, Result} = erlhttp:parse(Parser1),
+% Result is now [{url,<<"/index.html">>},{version,{1,1}},{method,get}]
+erlhttp:parse(Parser2),
+% continue parsing with the state returned from the previous call to parse
 ```
 
 ```erlhttp:parse``` return values:
