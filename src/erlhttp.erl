@@ -2,8 +2,8 @@
 
 -version(0.1).
 -on_load(init/0).
--export([new/0, parse_raw/2, is_upgrade/1, should_keepalive/1, update/2, parse/1, new_parser_raw/1]).
-
+-export([new/0, parse_raw/2, is_upgrade/1, should_keepalive/1, update/2, parse/1, new_parser_raw/1, clear_body_results/1]).
+-include_lib("eunit/include/eunit.hrl").
 
 init() ->
     erlang:load_nif(filename:join(code:priv_dir(?MODULE), atom_to_list(?MODULE) ++ "_nif"), 0).
@@ -34,108 +34,102 @@ parse({Parser, Mode, State, Rest, Result}) ->
 
 update({Parser, Mode, State, Rest, Result}, Bin) ->
     case parse_raw(Parser,Bin) of
-        {ok, Parsed} -> 
-            {ok, {Parser, Mode, State, Rest ++ lists:reverse(Parsed), Result}};
+        {ok, Parsed, Next} -> 
+            {ok, {Parser, Mode, State, Rest ++ lists:reverse(Parsed), Result}, Next};
         Error -> 
             Error
     end.
+
+parse(request, State, Rest, Result) ->
+    parse_request(State, Rest, Result);
+
+parse(headers, State, Rest, Result) ->
+    parse_headers(State, Rest, Result);
+
+parse(body, State, Rest, Result) ->
+    parse_body(State, Rest, Result);
+
+parse(done, State, Rest, Result) ->
+    parse_done(State, Rest, Result).
+
+
+parse_request(State, [Next|Rest], Result) ->
+    case {State, Next} of
+        {undefined, {header_field, _}}      ->  {request, {headers, undefined, [Next|Rest], []}, Result}; 
+        {undefined, {body, _}}              ->  {request, {body, undefined, [Next|Rest], <<>>}, Result}; 
+        {undefined, done}                   ->  {request, {done, undefined, [Next|Rest], []}, Result}; 
+        {undefined, Url={url, _}}           ->  parse_request(Url, Rest, Result); 
+        {{url, Url1}, {url, Url2}}          ->  parse_request({url, <<Url1/binary, Url2/binary>>}, Rest, Result); 
+        {Url={url, _}, _}                   ->  parse_request(undefined, [Next|Rest], [Url|Result]); 
+        {undefined, _}                      ->  parse_request(undefined, Rest, [Next|Result])
+    end;
+
+parse_request(State, [], Result) ->
+    {more, {request, State, [], Result}, Result}.
+
  
-%% Request Method
-parse(request, _State, [Method={method, _}|Rest], Result) ->
-    parse(request,undefined,Rest,[Method|Result]);
-
-%% Request HTTP Version
-parse(request, _State, [Version={version, _}|Rest], Result) ->
-    parse(request,undefined,Rest,[Version|Result]);
-
-%% Request URL
-
-% - continue
-parse(request, {url, Url1}, [{url, Url2}|Rest], Result) ->
-    parse(request,{url, <<Url1/binary, Url2/binary>>},Rest,Result);
-
-% - start
-parse(request,_,[Url={url, _}|Rest],Result) ->
-    parse(request,Url,Rest,Result);
-    
-% - end URL - return the request and parse headers next
-parse(request, Url={url, _}, [Next={header_field, _}|Rest], Result) ->
-    {request, {headers,undefined, [Next|Rest], []}, [Url|Result]};
-
-% - end Message
-parse(request, Url={url, _}, [done], Result) ->
-    {request, {done,undefined, [], []}, [Url|Result]};
-
-
 % Headers
 
+parse_headers(State, [Next|Rest], Result) ->
+    
+        % | State (prev. callback) | Callback   | Description/action                         |
+    case {State, Next} of
+    
+        %  ------------------------ ------------ --------------------------------------------
+        % | nothing (first call)   | on_h_field | Allocate new buffer and copy callback data |
+        % |                        |            | into it                                    |
+        
+        {undefined, {header_field, _}}                                  ->  parse_headers(Next, Rest, Result);
+        
+        %  ------------------------ ------------ --------------------------------------------
+        % | value                  | on_h_field | New header started.                        |
+        % |                        |            | Copy current name,value buffers to headers |
+        % |                        |            | list and allocate new buffer for new name  |
+        
+        {{header_field, HF1, header_value, HV}, {header_field, HF2}}    ->  parse_headers({header_field, HF2}, Rest, [{HF1,HV}|Result]);
+        
+        %  ------------------------ ------------ --------------------------------------------
+        % | field                  | on_h_field | Previous name continues. Reallocate name   |
+        % |                        |            | buffer and append callback data to it      |
+        
+        {{header_field, HF1}, {header_field, HF2}}                      ->  parse_headers({header_field, <<HF1/binary,HF2/binary>>}, Rest, Result);
+        
+        %  ------------------------ ------------ --------------------------------------------
+        % | field                  | on_h_value | Value for current header started. Allocate |
+        % |                        |            | new buffer and copy callback data to it    |
 
-% | State (prev. callback) | Callback   | Description/action                         |
+        {{header_field, HF}, {header_value, HV}}                        ->  parse_headers({header_field, HF, header_value, HV}, Rest, Result);
+        
+        %  ------------------------ ------------ --------------------------------------------
+        % | value                  | on_h_value | Value continues. Reallocate value buffer   |
+        % |                        |            | and append callback data to it             |
+        
+        {{header_field, HF, header_value, HV1}, {header_value, HV2}}    ->  parse_headers({header_field, HF, header_value, <<HV1/binary,HV2/binary>>}, Rest, Result);
+        
+        
+        % start of body
+        {{header_field, HF, header_value, HV}, {body, _}}               ->  {headers, {body, undefined, [Next|Rest], <<>>}, [{HF,HV}|Result]}; 
+        
+        % done
+        {{header_field, HF, header_value, HV}, done}                    ->  {headers, {done, undefined, [Next|Rest], []}, [{HF,HV}|Result]}
+        
+    end;
 
-%  ------------------------ ------------ --------------------------------------------
-% | field                  | on_h_field | Previous name continues. Reallocate name   |
-% |                        |            | buffer and append callback data to it      |
+parse_headers(State, [], Result) ->
+    {more, {headers, State, [], Result}, Result}.
+    
+parse_body(undefined, [{body, Body}|Rest], Result) ->
+    parse_body(undefined, Rest, <<Result/binary,Body/binary>>);
 
-parse(headers, {header_field, HF1}, [{header_field, HF2}|Rest], Result) ->
-    parse(headers, {header_field, <<HF1/binary,HF2/binary>>},Rest, Result);
+parse_body(undefined, [], Result) ->
+    {more, {body, undefined, [], Result}, Result};
 
-%  ------------------------ ------------ --------------------------------------------
-% | value                  | on_h_value | Value continues. Reallocate value buffer   |
-% |                        |            | and append callback data to it             |
+parse_body(undefined, [done], Result) ->
+    {body, {done, undefined, [done], []}, Result}.
 
-parse(headers, {header_field, HF, header_value, HV1}, [{header_value, HV2}|Rest], Result) ->
-    parse(headers, {header_field, HF, header_value, <<HV1/binary,HV2/binary>>}, Rest, Result);
-
-%  ------------------------ ------------ --------------------------------------------
-% | value                  | on_h_field | New header started.                        |
-% |                        |            | Copy current name,value buffers to headers |
-% |                        |            | list and allocate new buffer for new name  |
-
-parse(headers, {header_field, HF1, header_value, HV}, [{header_field, HF2}|Rest], Result) ->
-    parse(headers, {header_field, HF2},Rest,[{HF1,HV}|Result]);
-
-%  ------------------------ ------------ --------------------------------------------
-% | field                  | on_h_value | Value for current header started. Allocate |
-% |                        |            | new buffer and copy callback data to it    |
-
-parse(headers, {header_field, HF}, [{header_value, HV}|Rest], Result) ->
-    parse(headers, {header_field, HF, header_value, HV}, Rest, Result);
-
-%  ------------------------ ------------ --------------------------------------------
-% | nothing (first call)   | on_h_field | Allocate new buffer and copy callback data |
-% |                        |            | into it                                    |
-
-parse(headers, undefined, [{header_field, HF}|Rest], Result) ->
-    parse(headers, {header_field, HF},Rest,Result);
-
-%  ------------------------ ------------ --------------------------------------------
-% | done | body            | on_h_field | Header ended                               |
-% |                        |            |                                            |
-% |                        |            |                                            |
-
-parse(headers, {header_field, HF1, header_value, HV}, [done], Result) ->
-    {headers, {done, undefined, [], []}, [{HF1,HV}|Result]};
-
-parse(headers, {header_field, HF1, header_value, HV}, [Next={body, _}|Rest], Result) ->
-    {headers, {body, undefined, [Next|Rest], []}, [{HF1,HV}|Result]};
-
-
-% Body
-
-parse(body, undefined, [{body, Body}|Rest], Result) ->
-    parse(body, undefined, Rest, <<Result/binary,Body/binary>>);
-
-parse(body, undefined, [], Result) ->
-    {body, {body, undefined, [], []}, Result};
- 
-parse(body, undefined, [done], Result) ->
-    {body, {done, undefined, [], []}, Result};
-
-% done
-parse(done, State, Rest, Result) ->
-    {done, {done, State, Rest, Result}, []};
-
-%% need more data
-parse(Mode,State,Rest,Result) ->
-    {more, {Mode,State, Rest, Result}}.
+parse_done(undefined, [done], _Result) ->
+    {done, {done, undefined, [done], []}, done}.
+    
+clear_body_results({Parser, body, undefined, Rest, _Result}) ->
+    {Parser, body, undefined, Rest, <<>>}.
 

@@ -20,6 +20,7 @@ typedef struct {
     ERL_NIF_TERM buf_term;
     ErlNifBinary *buf_bin;
     ERL_NIF_TERM result;
+    int version_done;
     int done;
 } parser_data;
 
@@ -30,6 +31,19 @@ void emit(parser_data *data, const char *at, size_t length, const char* name)
     data->result = enif_make_list_cell(data->env, 
                         enif_make_tuple2(data->env, enif_make_atom(data->env, name), term), data->result);
 }
+
+
+void emit_version(http_parser *parser)
+{
+    parser_data *data = (parser_data *)parser->data;
+    
+    ERL_NIF_TERM version = enif_make_tuple2(data->env, enif_make_int(data->env, parser->http_major), enif_make_int(data->env, parser->http_minor));
+    data->result = enif_make_list_cell(data->env, 
+                        enif_make_tuple2(data->env, enif_make_atom(data->env, "version"), version),data->result);
+    data->version_done = 1;            
+}
+
+#define EMIT_VERSION_ONCE(PARSER) if (!((parser_data *)PARSER->data)->version_done) emit_version(PARSER)
 
 int on_message_begin (http_parser *parser)
 {
@@ -47,15 +61,10 @@ int on_message_begin (http_parser *parser)
                         enif_make_tuple2(data->env, enif_make_atom(data->env, "method"), enif_make_atom(data->env, buf)), data->result);
     free(buf);
 
-    buf = NULL;
-    
-    // version
-    ERL_NIF_TERM version = enif_make_tuple2(data->env, enif_make_int(data->env, parser->http_major), enif_make_int(data->env, parser->http_minor));
-    data->result = enif_make_list_cell(data->env, 
-                        enif_make_tuple2(data->env, enif_make_atom(data->env, "version"), version),data->result);
-                        
+    buf = NULL;                  
     return 0;
 }
+
 
 int on_url (http_parser *parser, const char *at, size_t length)
 {
@@ -70,6 +79,7 @@ int on_status_complete (http_parser *parser)
 
 int on_header_field (http_parser *parser, const char *at, size_t length)
 {   
+    EMIT_VERSION_ONCE(parser);
     emit(parser->data, at, length, "header_field");                        
     return 0;
 }
@@ -87,14 +97,17 @@ int on_headers_complete (http_parser *parser)
 
 int on_body (http_parser *parser, const char *at, size_t length)
 {
+    EMIT_VERSION_ONCE(parser);
     emit(parser->data, at, length, "body");
     return 0;
 }
 
 int on_message_complete (http_parser *parser)
 {
+    EMIT_VERSION_ONCE(parser);
     parser_data *data = (parser_data *)parser->data;
     data->done = 1;
+    http_parser_pause(parser, 1);
     return 0;
 }
 
@@ -136,16 +149,16 @@ static ERL_NIF_TERM new_parser_raw(ErlNifEnv* env, int argc, const ERL_NIF_TERM 
 
 static ERL_NIF_TERM parse_raw(ErlNifEnv* env, int argc, const ERL_NIF_TERM argv[])
 {
-
-    
     http_parser *parser;
     
     if (!enif_get_resource(env, argv[0], erlhttp_parser_resource, (void **)&parser)) {
         return enif_make_badarg(env);
     }
     
+    ERL_NIF_TERM buf_term = argv[1];
+    
     ErlNifBinary buf;
-    if (!enif_inspect_binary(env, argv[1], &buf)) {
+    if (!enif_inspect_binary(env, buf_term, &buf)) {
         return enif_make_badarg(env);
     }
     
@@ -160,7 +173,7 @@ static ERL_NIF_TERM parse_raw(ErlNifEnv* env, int argc, const ERL_NIF_TERM argv[
     int nparsed = http_parser_execute(parser, &settings, (const char *)buf.data, buf.size);
     
     
-    if (nparsed != buf.size || HTTP_PARSER_ERRNO(parser) != HPE_OK) {
+    if (HTTP_PARSER_ERRNO(parser) != HPE_OK && HTTP_PARSER_ERRNO(parser) != HPE_PAUSED) {
         
         const char *reason_str = http_errno_description(HTTP_PARSER_ERRNO(parser));
         size_t reason_str_len = strlen(reason_str);
@@ -171,10 +184,21 @@ static ERL_NIF_TERM parse_raw(ErlNifEnv* env, int argc, const ERL_NIF_TERM argv[
 
         return enif_make_tuple2(env, enif_make_atom(env, "error"), reason);
     } else {
+        
         if (data->done == 1) {
             data->result = enif_make_list_cell(data->env, enif_make_atom(data->env, "done"), data->result);
         }
-        return enif_make_tuple2(env, enif_make_atom(env, "ok"), data->result);
+        
+        printf("%d >> %zd\n", nparsed, buf.size);
+        
+        ERL_NIF_TERM rest;
+        if (nparsed != buf.size) {
+            rest = enif_make_sub_binary(env, buf_term, nparsed, buf.size-nparsed);
+        } else {
+            enif_make_new_binary(env, 0, &rest);
+        }
+ 
+        return enif_make_tuple3(env, enif_make_atom(env, "ok"), data->result, rest);
     }
 }
 
