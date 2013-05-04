@@ -26,9 +26,9 @@ erlhttp:parse(Parser2),
 
 ```{body, Parser, Result}``` finished parsing a body chunk
 
-```{done, Parser}``` done parsing
+```{done, Parser, Result}``` done parsing
 
-```{more, Parser}``` need more data, call erlhttp:parse/2
+```{more, Parser, Result}``` need more data, call erlhttp:parse/2
 
 
 License
