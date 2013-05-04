@@ -18,19 +18,19 @@ erlhttp:parse(Parser2),
 % continue parsing with the state returned from the previous call to parse
 ```
 
-```erlang erlhttp:parse``` return values:
+```erlhttp:parse``` return values:
 
-```erlang {request, Parser, Result}``` finished parsing request method, url & http version
+```{request, Parser, Result}``` finished parsing request method, url & http version
 
-```erlang {headers, Parser, Result}``` finished parsing headers
+```{headers, Parser, Result}``` finished parsing headers
 
-```erlang {body, Parser, Result}``` finished parsing a body chunk
+```{body, Parser, Result}``` finished parsing a body chunk
 
-```erlang {done, Parser, Result}``` done parsing
+```{done, Parser, Result}``` done parsing
 
-```erlang {more, Parser, Result}``` need more data, call erlhttp:parse/2
+```{more, Parser, Result}``` need more data, call erlhttp:parse/2
 
-The parser will automatically accumulate the request body. To clear the results of the request body, e.g. after writing to a file, call ```erlang clear_body_results(Parser)```
+The parser will automatically accumulate the request body. To clear the results of the request body, e.g. after writing to a file, call ```clear_body_results(Parser)```
 
 License
 -------------------------
