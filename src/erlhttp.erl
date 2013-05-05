@@ -122,10 +122,10 @@ parse_body(undefined, [{body, Body}|Rest], Result) ->
     parse_body(undefined, Rest, <<Result/binary,Body/binary>>);
 
 parse_body(undefined, [], Result) ->
-    {more, {body, undefined, [], Result}, Result};
+    {body_chunk, {body, undefined, [], Result}, Result};
 
 parse_body(undefined, [done], Result) ->
-    {body, {done, undefined, [done], []}, Result}.
+    {body_chunk, {done, undefined, [done], []}, Result}.
 
 parse_done(undefined, [done], _Result) ->
     {done, {done, undefined, [done], []}, done}.
