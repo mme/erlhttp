@@ -17,16 +17,16 @@
 simple_test() ->
     {ok, Parser} = erlhttp:new(),
     Request = <<"GET /index.html HTTP/1.1\r\nHost: www.example.com\r\n\r\n">>,
-    {ok, Parser1, _} = erlhttp:update(Parser, Request),
+    {ok, _, Parser1} = erlhttp:update(Request, Parser),
     
     % Result = erlhttp:parse(Parser1),
     % ?debugFmt("~p~n", [Result]),
     
         % 
-    {request, Parser2, Result} = erlhttp:parse(Parser1),
+    {request, Result, Parser2} = erlhttp:parse(Parser1),
     ?debugFmt("~p~n", [Result]),
     % ?debugFmt("~p~n", [Result]),
-    {headers, Parser3, Result1} = erlhttp:parse(Parser2),
+    {headers, Result1, Parser3} = erlhttp:parse(Parser2),
     ?debugFmt("~p~n", [Result1]),
     ?debugFmt("~p~n", [Parser3]),
     ResultDone = erlhttp:parse(Parser3),
@@ -55,7 +55,7 @@ pipeline_test() ->
     "0123456789">>,
     ?debugFmt("~p~n", [Request]),
     % Request = <<"GET /index.html HTTP/1.1\r\nHost: www.example.com\r\n\r\nGET /index1.html HTTP/1.1\r\nHost: www.example.com\r\n\r\n">>,
-    Result = erlhttp:update(Parser, Request),
+    Result = erlhttp:update(Request, Parser),
     ?debugFmt("~p~n", [Result]),
     ok.
 % 

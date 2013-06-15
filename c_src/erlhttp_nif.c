@@ -1,35 +1,66 @@
-/* niftest.c */
-
 #include "http_parser.h"
 #include "string.h"
-#include <ctype.h>
 #include "erl_nif.h"
-#include <stdio.h>
 
-static ErlNifResourceType *erlhttp_parser_resource = NULL;
+static ErlNifResourceType *http_parser_resource = NULL;
 
+static ERL_NIF_TERM k_atom_ok;
+static ERL_NIF_TERM k_atom_error;
 
-typedef struct {
-    ErlNifBinary *bin;
-    ERL_NIF_TERM bin_term;
-    int retained;
-} bin_pointer;
+static ERL_NIF_TERM k_atom_nil;
+static ERL_NIF_TERM k_atom_true;
+static ERL_NIF_TERM k_atom_false;
 
+static ERL_NIF_TERM k_atom_version;
+
+static ERL_NIF_TERM k_atom_url;
+static ERL_NIF_TERM k_atom_header_field;
+static ERL_NIF_TERM k_atom_header_value;
+static ERL_NIF_TERM k_atom_body;
+static ERL_NIF_TERM k_atom_done;
+
+static ERL_NIF_TERM k_atom_method;
+
+static ERL_NIF_TERM k_atom_method_delete;
+static ERL_NIF_TERM k_atom_method_get;
+static ERL_NIF_TERM k_atom_method_head;
+static ERL_NIF_TERM k_atom_method_post;
+static ERL_NIF_TERM k_atom_method_put;
+static ERL_NIF_TERM k_atom_method_connect;
+static ERL_NIF_TERM k_atom_method_options;
+static ERL_NIF_TERM k_atom_method_trace;
+static ERL_NIF_TERM k_atom_method_copy;
+static ERL_NIF_TERM k_atom_method_lock;
+static ERL_NIF_TERM k_atom_method_mkcol;
+static ERL_NIF_TERM k_atom_method_move;
+static ERL_NIF_TERM k_atom_method_propfind;
+static ERL_NIF_TERM k_atom_method_proppatch;
+static ERL_NIF_TERM k_atom_method_search;
+static ERL_NIF_TERM k_atom_method_unlock;
+static ERL_NIF_TERM k_atom_method_report;
+static ERL_NIF_TERM k_atom_method_mkactivity;
+static ERL_NIF_TERM k_atom_method_checkout;
+static ERL_NIF_TERM k_atom_method_merge;
+static ERL_NIF_TERM k_atom_method_msearch;
+static ERL_NIF_TERM k_atom_method_notify;
+static ERL_NIF_TERM k_atom_method_subscribe;
+static ERL_NIF_TERM k_atom_method_unsubscribe;
+static ERL_NIF_TERM k_atom_method_patch;
+static ERL_NIF_TERM k_atom_method_purge;
+    
 typedef struct {
     ErlNifEnv *env;
     ERL_NIF_TERM buf_term;
     ErlNifBinary *buf_bin;
     ERL_NIF_TERM result;
     int version_done;
-    int done;
 } parser_data;
 
-void emit(parser_data *data, const char *at, size_t length, const char* name)
+void emit(parser_data *data, const char *at, size_t length, ERL_NIF_TERM name)
 {
     size_t pos = ((void *)at) - ((void *)data->buf_bin->data);
     ERL_NIF_TERM term = enif_make_sub_binary(data->env, data->buf_term, pos, length);
-    data->result = enif_make_list_cell(data->env, 
-                        enif_make_tuple2(data->env, enif_make_atom(data->env, name), term), data->result);
+    data->result = enif_make_list_cell(data->env, enif_make_tuple2(data->env, name, term), data->result);
 }
 
 
@@ -38,8 +69,7 @@ void emit_version(http_parser *parser)
     parser_data *data = (parser_data *)parser->data;
     
     ERL_NIF_TERM version = enif_make_tuple2(data->env, enif_make_int(data->env, parser->http_major), enif_make_int(data->env, parser->http_minor));
-    data->result = enif_make_list_cell(data->env, 
-                        enif_make_tuple2(data->env, enif_make_atom(data->env, "version"), version),data->result);
+    data->result = enif_make_list_cell(data->env, enif_make_tuple2(data->env, k_atom_version, version),data->result);
     data->version_done = 1;            
 }
 
@@ -49,26 +79,45 @@ int on_message_begin (http_parser *parser)
 {
     parser_data *data = (parser_data *)parser->data;
     
-    char *buf;
-    // Method
-    const char *method = http_method_str(parser->method);
-    size_t method_len = strlen(method) + 1;
-    buf = malloc(method_len);
-    strlcpy(buf, method, method_len);
-    char *p = buf;
-    for ( ; *p; ++p) *p = tolower(*p);
-    data->result = enif_make_list_cell(data->env, 
-                        enif_make_tuple2(data->env, enif_make_atom(data->env, "method"), enif_make_atom(data->env, buf)), data->result);
-    free(buf);
-
-    buf = NULL;                  
+    ERL_NIF_TERM method = k_atom_error;
+    
+    switch(parser->method) {
+        case HTTP_DELETE:      method = k_atom_method_delete;       break;
+        case HTTP_GET:         method = k_atom_method_get;          break;
+        case HTTP_HEAD:        method = k_atom_method_head;         break;
+        case HTTP_POST:        method = k_atom_method_post;         break;
+        case HTTP_PUT:         method = k_atom_method_put;          break;
+        case HTTP_CONNECT:     method = k_atom_method_connect;      break;
+        case HTTP_OPTIONS:     method = k_atom_method_options;      break;
+        case HTTP_TRACE:       method = k_atom_method_trace;        break;
+        case HTTP_COPY:        method = k_atom_method_copy;         break;
+        case HTTP_LOCK:        method = k_atom_method_lock;         break;
+        case HTTP_MKCOL:       method = k_atom_method_mkcol;        break;
+        case HTTP_MOVE:        method = k_atom_method_move;         break;
+        case HTTP_PROPFIND:    method = k_atom_method_propfind;     break;
+        case HTTP_PROPPATCH:   method = k_atom_method_proppatch;    break;
+        case HTTP_SEARCH:      method = k_atom_method_search;       break;
+        case HTTP_UNLOCK:      method = k_atom_method_unlock;       break;
+        case HTTP_REPORT:      method = k_atom_method_report;       break;
+        case HTTP_MKACTIVITY:  method = k_atom_method_mkactivity;   break;
+        case HTTP_CHECKOUT:    method = k_atom_method_checkout;     break;
+        case HTTP_MERGE:       method = k_atom_method_merge;        break;
+        case HTTP_MSEARCH:     method = k_atom_method_msearch;      break;
+        case HTTP_NOTIFY:      method = k_atom_method_notify;       break;
+        case HTTP_SUBSCRIBE:   method = k_atom_method_subscribe;    break;
+        case HTTP_UNSUBSCRIBE: method = k_atom_method_unsubscribe;  break;
+        case HTTP_PATCH:       method = k_atom_method_patch;        break;
+        case HTTP_PURGE:       method = k_atom_method_purge;        break;
+    }
+    data->result = enif_make_list_cell(data->env, enif_make_tuple2(data->env, k_atom_method, method), data->result);
+                 
     return 0;
 }
 
 
 int on_url (http_parser *parser, const char *at, size_t length)
 {
-    emit(parser->data, at, length, "url");   
+    emit(parser->data, at, length, k_atom_url);   
     return 0;
 }
 
@@ -80,13 +129,13 @@ int on_status_complete (http_parser *parser)
 int on_header_field (http_parser *parser, const char *at, size_t length)
 {   
     EMIT_VERSION_ONCE(parser);
-    emit(parser->data, at, length, "header_field");                        
+    emit(parser->data, at, length, k_atom_header_field);                        
     return 0;
 }
 
 int on_header_value (http_parser *parser, const char *at, size_t length)
 {
-    emit(parser->data, at, length, "header_value");
+    emit(parser->data, at, length, k_atom_header_value);
     return 0;
 }
 
@@ -98,7 +147,7 @@ int on_headers_complete (http_parser *parser)
 int on_body (http_parser *parser, const char *at, size_t length)
 {
     EMIT_VERSION_ONCE(parser);
-    emit(parser->data, at, length, "body");
+    emit(parser->data, at, length, k_atom_body);
     return 0;
 }
 
@@ -106,7 +155,7 @@ int on_message_complete (http_parser *parser)
 {
     EMIT_VERSION_ONCE(parser);
     parser_data *data = (parser_data *)parser->data;
-    data->done = 1;
+    data->result = enif_make_list_cell(data->env, k_atom_done, data->result);
     http_parser_pause(parser, 1);
     return 0;
 }
@@ -123,7 +172,7 @@ static http_parser_settings settings = {
     .on_message_complete    = on_message_complete
 };
 
-static ERL_NIF_TERM new_parser_raw(ErlNifEnv* env, int argc, const ERL_NIF_TERM argv[])
+static ERL_NIF_TERM new(ErlNifEnv* env, int argc, const ERL_NIF_TERM argv[])
 {
     int parser_type = 0;
     
@@ -135,7 +184,7 @@ static ERL_NIF_TERM new_parser_raw(ErlNifEnv* env, int argc, const ERL_NIF_TERM 
         return enif_make_badarg(env);
     }
         
-    http_parser *parser = enif_alloc_resource(erlhttp_parser_resource, sizeof(http_parser));
+    http_parser *parser = enif_alloc_resource(http_parser_resource, sizeof(http_parser));
     parser_data *data = malloc(sizeof(parser_data));
     memset(data,0,sizeof(parser_data));
     http_parser_init(parser, parser_type);
@@ -144,14 +193,14 @@ static ERL_NIF_TERM new_parser_raw(ErlNifEnv* env, int argc, const ERL_NIF_TERM 
     ERL_NIF_TERM parser_term = enif_make_resource(env, parser);
     enif_release_resource(parser);
     
-    return enif_make_tuple2(env, enif_make_atom(env, "ok"), parser_term);
+    return enif_make_tuple2(env, k_atom_ok, parser_term);
 }
 
-static ERL_NIF_TERM parse_raw(ErlNifEnv* env, int argc, const ERL_NIF_TERM argv[])
+static ERL_NIF_TERM parse(ErlNifEnv* env, int argc, const ERL_NIF_TERM argv[])
 {
     http_parser *parser;
     
-    if (!enif_get_resource(env, argv[0], erlhttp_parser_resource, (void **)&parser)) {
+    if (!enif_get_resource(env, argv[0], http_parser_resource, (void **)&parser)) {
         return enif_make_badarg(env);
     }
     
@@ -182,14 +231,8 @@ static ERL_NIF_TERM parse_raw(ErlNifEnv* env, int argc, const ERL_NIF_TERM argv[
         unsigned char *buf = enif_make_new_binary(env, reason_str_len, &reason);
         memcpy(buf, reason_str, reason_str_len);
 
-        return enif_make_tuple2(env, enif_make_atom(env, "error"), reason);
+        return enif_make_tuple2(env, k_atom_error, reason);
     } else {
-        
-        if (data->done == 1) {
-            data->result = enif_make_list_cell(data->env, enif_make_atom(data->env, "done"), data->result);
-        }
-        
-        printf("%d >> %zd\n", nparsed, buf.size);
         
         ERL_NIF_TERM rest;
         if (nparsed != buf.size) {
@@ -198,7 +241,7 @@ static ERL_NIF_TERM parse_raw(ErlNifEnv* env, int argc, const ERL_NIF_TERM argv[
             enif_make_new_binary(env, 0, &rest);
         }
  
-        return enif_make_tuple3(env, enif_make_atom(env, "ok"), data->result, rest);
+        return enif_make_tuple3(env, k_atom_ok, data->result, rest);
     }
 }
 
@@ -207,11 +250,11 @@ static ERL_NIF_TERM is_upgrade(ErlNifEnv* env, int argc, const ERL_NIF_TERM argv
 
     http_parser *parser;
     
-    if (!enif_get_resource(env, argv[0], erlhttp_parser_resource, (void **)&parser)) {
+    if (!enif_get_resource(env, argv[0], http_parser_resource, (void **)&parser)) {
         return enif_make_badarg(env);
     }
     
-    return parser->upgrade ? enif_make_atom(env, "true") : enif_make_atom(env, "false");
+    return parser->upgrade ? k_atom_true : k_atom_false;
 }
 
 static ERL_NIF_TERM should_keepalive(ErlNifEnv* env, int argc, const ERL_NIF_TERM argv[])
@@ -219,33 +262,90 @@ static ERL_NIF_TERM should_keepalive(ErlNifEnv* env, int argc, const ERL_NIF_TER
 
     http_parser *parser;
     
-    if (!enif_get_resource(env, argv[0], erlhttp_parser_resource, (void **)&parser)) {
+    if (!enif_get_resource(env, argv[0], http_parser_resource, (void **)&parser)) {
         return enif_make_badarg(env);
     }
     
-    return http_should_keep_alive(parser) ? enif_make_atom(env, "true") : enif_make_atom(env, "false");
+    return http_should_keep_alive(parser) ? k_atom_true : k_atom_false;
 }
 
 
-void erlhttp_parser_resource_dtor(ErlNifEnv* env, void* obj)
+void http_parser_resource_dtor(ErlNifEnv* env, void* obj)
 {
-    
     http_parser *parser = (http_parser *)obj;
     free (parser->data);
 }
 
 static ErlNifFunc nif_funcs[] =
 {
-    {"new_parser_raw", 1, new_parser_raw},
-    {"parse_raw", 2, parse_raw},
+    {"new_parser_raw", 1, new},
+    {"parse_raw", 2, parse},
     {"should_keepalive", 1, should_keepalive},
     {"is_upgrade", 1, is_upgrade}
 };
 
-int load(ErlNifEnv* env, void** priv_data, ERL_NIF_TERM load_info) 
+static int reload(ErlNifEnv* env, void** priv, ERL_NIF_TERM info)
 {
-    erlhttp_parser_resource = enif_open_resource_type(env, "erlhttp", "erlhttp_parser_resource", &erlhttp_parser_resource_dtor, ERL_NIF_RT_CREATE, NULL);
     return 0;
 }
 
-ERL_NIF_INIT(erlhttp,nif_funcs,&load,NULL,NULL,NULL)
+static int upgrade(ErlNifEnv* env, void** priv, void** old_priv, ERL_NIF_TERM info)
+{
+    *priv = *old_priv;
+    return 0;
+}
+
+static void unload(ErlNifEnv* env, void* priv)
+{
+}
+
+static int load(ErlNifEnv* env, void** priv_data, ERL_NIF_TERM load_info) 
+{
+    http_parser_resource        = enif_open_resource_type(env, "http_parser", "http_parser_resource", &http_parser_resource_dtor, ERL_NIF_RT_CREATE, NULL);
+    
+    k_atom_error                = enif_make_atom(env, "error");
+    k_atom_ok                   = enif_make_atom(env, "ok");
+    k_atom_version              = enif_make_atom(env, "version");
+    k_atom_nil                  = enif_make_atom(env, "nil");
+    k_atom_true                 = enif_make_atom(env, "true");
+    k_atom_false                = enif_make_atom(env, "false");
+    
+    k_atom_version              = enif_make_atom(env, "version");
+    k_atom_url                  = enif_make_atom(env, "url");
+    k_atom_header_field         = enif_make_atom(env, "header_field");
+    k_atom_header_value         = enif_make_atom(env, "header_value");
+    k_atom_body                 = enif_make_atom(env, "body");
+    k_atom_done                 = enif_make_atom(env, "done");
+    k_atom_method               = enif_make_atom(env, "method");
+    
+    k_atom_method_delete        = enif_make_atom(env, "delete");
+    k_atom_method_get           = enif_make_atom(env, "get");
+    k_atom_method_head          = enif_make_atom(env, "head");
+    k_atom_method_post          = enif_make_atom(env, "post");
+    k_atom_method_put           = enif_make_atom(env, "put");
+    k_atom_method_connect       = enif_make_atom(env, "connect");
+    k_atom_method_options       = enif_make_atom(env, "options");
+    k_atom_method_trace         = enif_make_atom(env, "trace");
+    k_atom_method_copy          = enif_make_atom(env, "copy");
+    k_atom_method_lock          = enif_make_atom(env, "lock");
+    k_atom_method_mkcol         = enif_make_atom(env, "mkcol");
+    k_atom_method_move          = enif_make_atom(env, "move");
+    k_atom_method_propfind      = enif_make_atom(env, "propfind");
+    k_atom_method_proppatch     = enif_make_atom(env, "proppatch");
+    k_atom_method_search        = enif_make_atom(env, "search");
+    k_atom_method_unlock        = enif_make_atom(env, "unlock");
+    k_atom_method_report        = enif_make_atom(env, "report");
+    k_atom_method_mkactivity    = enif_make_atom(env, "mkactivity");
+    k_atom_method_checkout      = enif_make_atom(env, "checkout");
+    k_atom_method_merge         = enif_make_atom(env, "merge");
+    k_atom_method_msearch       = enif_make_atom(env, "msearch");
+    k_atom_method_notify        = enif_make_atom(env, "notify");
+    k_atom_method_subscribe     = enif_make_atom(env, "subscribe");
+    k_atom_method_unsubscribe   = enif_make_atom(env, "unsubscribe");
+    k_atom_method_patch         = enif_make_atom(env, "patch");
+    k_atom_method_purge         = enif_make_atom(env, "purge");
+    
+    return 0;
+}
+
+ERL_NIF_INIT(erlhttp,nif_funcs,&load,&reload,&upgrade,&unload)

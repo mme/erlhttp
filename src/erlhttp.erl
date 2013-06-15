@@ -29,13 +29,13 @@ new() ->
 parse({Parser, Mode, State, Rest, Result}) ->
     case parse(Mode, State, Rest, Result) of
         {more, {Mode1, State1, Rest1, Result1}} -> {more, {Parser, Mode1, State1, Rest1, Result1}};
-        {Other, {Mode1, State1, Rest1, []}, Result1} -> {Other, {Parser, Mode1, State1, Rest1, []}, Result1}
+        {Other, {Mode1, State1, Rest1, []}, Result1} -> {Other, Result1, {Parser, Mode1, State1, Rest1, []} }
     end.
 
-update({Parser, Mode, State, Rest, Result}, Bin) ->
+update(Bin,{Parser, Mode, State, Rest, Result}) ->
     case parse_raw(Parser,Bin) of
         {ok, Parsed, Next} -> 
-            {ok, {Parser, Mode, State, Rest ++ lists:reverse(Parsed), Result}, Next};
+            {ok, Next, {Parser, Mode, State, Rest ++ lists:reverse(Parsed), Result}};
         Error -> 
             Error
     end.
