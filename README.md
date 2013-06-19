@@ -10,9 +10,9 @@ Usage
 ```erlang
 {ok, Parser} = erlhttp:new(),
 Request = <<"GET /index.html HTTP/1.1\r\nHost: www.example.com\r\n\r\n">>,
-{ok, Parser1, Rest} = erlhttp:update(Parser, Request), 
+{ok, Rest, Parser1} = erlhttp:update(Parser, Request), 
 % In a pipelined connection, Rest will contain parts of the next request 
-{request, Parser2, Result} = erlhttp:parse(Parser1),
+{request, Result, Parser2} = erlhttp:parse(Parser1),
 % Result is now [{url,<<"/index.html">>},{version,{1,1}},{method,get}]
 erlhttp:parse(Parser2),
 % continue parsing with the state returned from the previous call to parse
@@ -20,15 +20,15 @@ erlhttp:parse(Parser2),
 
 ```erlhttp:parse``` return values:
 
-```{request, Parser, Result}``` finished parsing request method, url & http version
+```{request, Result, Parser}``` finished parsing request method, url & http version
 
-```{headers, Parser, Result}``` finished parsing headers
+```{headers, Result, Parser}``` finished parsing headers
 
-```{body, Parser, Result}``` finished parsing a body chunk
+```{body, Result, Parser}``` finished parsing a body chunk
 
-```{done, Parser, Result}``` done parsing
+```{done, Result, Parser}``` done parsing
 
-```{more, Parser, Result}``` need more data, call erlhttp:parse/2
+```{more, Result, Parser}``` need more data, call erlhttp:parse/2
 
 The parser will automatically accumulate the request body. To clear the results of the request body, e.g. after writing to a file, call ```clear_body_results(Parser)```
 
