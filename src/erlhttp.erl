@@ -3,7 +3,6 @@
 -version(0.1).
 -on_load(init/0).
 -export([new/0, parse_raw/2, is_upgrade/1, should_keepalive/1, update/2, parse/1, new_parser_raw/1, clear_body_results/1]).
--include_lib("eunit/include/eunit.hrl").
 
 init() ->
     PrivDir = case code:priv_dir(?MODULE) of
@@ -141,4 +140,3 @@ parse_done(undefined, [done], _Result) ->
 
 clear_body_results({Parser, body, undefined, Rest, _Result}) ->
     {Parser, body, undefined, Rest, <<>>}.
-
