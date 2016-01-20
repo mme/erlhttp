@@ -121,9 +121,14 @@ int on_url (http_parser *parser, const char *at, size_t length)
     return 0;
 }
 
+int on_chunk_header (http_parser *parser)
+{
+  return 0;
+}
+
 int on_chunk_complete (http_parser *parser)
 {
-    return 0;
+  return 0;
 }
 
 int on_header_field (http_parser *parser, const char *at, size_t length)
@@ -163,6 +168,7 @@ int on_message_complete (http_parser *parser)
 static http_parser_settings settings = {
     .on_message_begin       = on_message_begin,
     .on_url                 = on_url,
+    .on_chunk_header        = on_chunk_header,
     .on_chunk_complete      = on_chunk_complete,
 
     .on_header_field        = on_header_field,

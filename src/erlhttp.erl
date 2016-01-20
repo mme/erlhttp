@@ -37,7 +37,9 @@ new() ->
 parse({Parser, Mode, State, Rest, Result}) ->
     case parse(Mode, State, Rest, Result) of
         {more, {Mode1, State1, Rest1, Result1}} -> {more, {Parser, Mode1, State1, Rest1, Result1}};
-        {Other, {Mode1, State1, Rest1, []}, Result1} -> {Other, Result1, {Parser, Mode1, State1, Rest1, []} }
+        {Other, {Mode1, State1, Rest1, <<>>}, Result1} -> {Other, Result1, {Parser, Mode1, State1, Rest1, <<>>} };
+        {Other, {Mode1, State1, Rest1, []}, Result1} -> {Other, Result1, {Parser, Mode1, State1, Rest1, []} };
+        {Other, {Mode1, State1, Rest1, _}, Result1} -> {Other, Result1, {Parser, Mode1, State1, Rest1, <<>>} }
     end.
 
 update(Bin,{Parser, Mode, State, Rest, Result}) ->
@@ -79,7 +81,6 @@ parse_request(State, [], Result) ->
 % Headers
 
 parse_headers(State, [Next|Rest], Result) ->
-
         % | State (prev. callback) | Callback   | Description/action                         |
     case {State, Next} of
 
