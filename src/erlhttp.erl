@@ -3,7 +3,6 @@
 -version(0.1).
 -on_load(init/0).
 -export([new/0, parse_raw/2, is_upgrade/1, should_keepalive/1, update/2, parse/1, new_parser_raw/1, clear_body_results/1]).
--include_lib("eunit/include/eunit.hrl").
 
 init() ->
     PrivDir = case code:priv_dir(?MODULE) of
@@ -38,7 +37,9 @@ new() ->
 parse({Parser, Mode, State, Rest, Result}) ->
     case parse(Mode, State, Rest, Result) of
         {more, {Mode1, State1, Rest1, Result1}} -> {more, {Parser, Mode1, State1, Rest1, Result1}};
-        {Other, {Mode1, State1, Rest1, []}, Result1} -> {Other, Result1, {Parser, Mode1, State1, Rest1, []} }
+        {Other, {Mode1, State1, Rest1, <<>>}, Result1} -> {Other, Result1, {Parser, Mode1, State1, Rest1, <<>>} };
+        {Other, {Mode1, State1, Rest1, []}, Result1} -> {Other, Result1, {Parser, Mode1, State1, Rest1, []} };
+        {Other, {Mode1, State1, Rest1, _}, Result1} -> {Other, Result1, {Parser, Mode1, State1, Rest1, <<>>} }
     end.
 
 update(Bin,{Parser, Mode, State, Rest, Result}) ->
@@ -80,7 +81,6 @@ parse_request(State, [], Result) ->
 % Headers
 
 parse_headers(State, [Next|Rest], Result) ->
-
         % | State (prev. callback) | Callback   | Description/action                         |
     case {State, Next} of
 
@@ -141,4 +141,3 @@ parse_done(undefined, [done], _Result) ->
 
 clear_body_results({Parser, body, undefined, Rest, _Result}) ->
     {Parser, body, undefined, Rest, <<>>}.
-

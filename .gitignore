@@ -1,3 +1,6 @@
+.rebar3
+_build
+*.d
 *~
 .eunit
 c_src/config.h
